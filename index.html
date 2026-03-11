@@ -233,8 +233,8 @@
   let lastTs = 0;
 
   const state = {
-    p1: { y: H/2 - PAD_H/2, score: 0, up: false, down: false },
-    p2: { y: H/2 - PAD_H/2, score: 0, up: false, down: false },
+    p1: { y: H/2 - PAD_H/2, score: 0, up: false, down: false, vy: 0 },
+    p2: { y: H/2 - PAD_H/2, score: 0, up: false, down: false, vy: 0 },
     ball: { x: W/2, y: H/2, vx: 0, vy: 0 },
     trail: [],
     particles: []
@@ -393,8 +393,8 @@
   function startGame() {
     state.p1.score = 0;
     state.p2.score = 0;
-    state.p1.y = H/2 - PAD_H/2;
-    state.p2.y = H/2 - PAD_H/2;
+    state.p1.y = H/2 - PAD_H/2; state.p1.vy = 0;
+    state.p2.y = H/2 - PAD_H/2; state.p2.vy = 0;
     score1El.textContent = '0';
     score2El.textContent = '0';
     resetBall(1);
@@ -440,11 +440,15 @@
       }
     }
 
-    // Move paddles
+    // Move paddles (track velocity for spin effect)
+    const p1prevY = state.p1.y;
+    const p2prevY = state.p2.y;
     if (state.p1.up)   state.p1.y = Math.max(0, state.p1.y - PAD_SPEED);
     if (state.p1.down) state.p1.y = Math.min(H - PAD_H, state.p1.y + PAD_SPEED);
     if (state.p2.up)   state.p2.y = Math.max(0, state.p2.y - PAD_SPEED);
     if (state.p2.down) state.p2.y = Math.min(H - PAD_H, state.p2.y + PAD_SPEED);
+    state.p1.vy = state.p1.y - p1prevY;
+    state.p2.vy = state.p2.y - p2prevY;
 
     // Move ball
     state.ball.x += state.ball.vx;
@@ -506,12 +510,16 @@
   }
 
   function bounceOff(pad) {
-    const hitPos = (state.ball.y - (pad.y + PAD_H/2)) / (PAD_H/2);
-    const angle = hitPos * Math.PI / 4;
     const speed = Math.min(Math.sqrt(state.ball.vx**2 + state.ball.vy**2) + 0.3, 14);
     const dir = state.ball.vx < 0 ? 1 : -1;
-    state.ball.vx = dir * Math.cos(angle) * speed;
-    state.ball.vy = Math.sin(angle) * speed;
+    // Football kick effect: paddle velocity determines spin.
+    // If paddle is still → ball bounces straight. Faster paddle → more effect.
+    const SPIN_FACTOR = 1.2;
+    let newVy = pad.vy * SPIN_FACTOR;
+    const maxVy = speed * 0.85; // cap at ~58 degrees
+    newVy = Math.max(-maxVy, Math.min(maxVy, newVy));
+    state.ball.vx = dir * Math.sqrt(speed * speed - newVy * newVy);
+    state.ball.vy = newVy;
   }
 
   function checkWin(player) {
